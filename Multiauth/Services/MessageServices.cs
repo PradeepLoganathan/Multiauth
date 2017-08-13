@@ -5,6 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Twilio;
+using Twilio.Rest.Api.V2010.Account;
+using Twilio.Types;
 
 namespace Multiauth.Services
 {
@@ -13,19 +16,27 @@ namespace Multiauth.Services
     // For more details see this link https://go.microsoft.com/fwlink/?LinkID=532713
     public class AuthMessageSender : IEmailSender, ISmsSender
     {
-        public AuthMessageSenderOptions Options { get; } //set only via Secret Manager
+        public SendGridOptions EmailOptions { get; } //set only via Secret Manager
+        public TwilioSMSoptions SmsOptions { get; }
 
-        public AuthMessageSender(IOptions<AuthMessageSenderOptions> optionsAccessor)
+        public AuthMessageOptions MessageOptions;
+
+        public AuthMessageSender(IOptions<AuthMessageOptions> optionsAccessor)
         {
-            Options = optionsAccessor.Value;
+            MessageOptions = optionsAccessor.Value;
         }
+
+        //public AuthMessageSender(IOptions<SMSoptions> optionsAccessor)
+        //{
+        //    SmsOptions = optionsAccessor.Value;
+        //}
         public Task SendEmailAsync(string email, string subject, string message)
         {
             // Plug in your email service here to send an email.
-            return Execute(Options.SendGridKey, subject, message, email);
+            return ExecuteSendGridMailer(MessageOptions.EmailOptions.SendGridKey, subject, message, email);
         }
 
-        public Task Execute(string apiKey, string subject, string message, string email)
+        public Task ExecuteSendGridMailer(string apiKey, string subject, string message, string email)
         {
             var client = new SendGridClient(apiKey);
             var msg = new SendGridMessage()
@@ -41,7 +52,24 @@ namespace Multiauth.Services
 
         public Task SendSmsAsync(string number, string message)
         {
+            return ExecuteTwilioSMS(number, message);
+        }
+
+        private Task ExecuteTwilioSMS(string number, string message)
+        {
             // Plug in your SMS service here to send a text message.
+            // Your Account SID from twilio.com/console
+            
+            var accountSid = MessageOptions.SMSOptions.SMSAccountIdentification;
+            // Your Auth Token from twilio.com/console
+            var authToken = MessageOptions.SMSOptions.SMSAccountPassword;
+
+            TwilioClient.Init(accountSid, authToken);
+
+            var msg = MessageResource.Create(
+              to: new PhoneNumber(number),
+              from: new PhoneNumber(MessageOptions.SMSOptions.SMSAccountFrom),
+              body: message);
             return Task.FromResult(0);
         }
     }
